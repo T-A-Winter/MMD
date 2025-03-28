@@ -1,6 +1,11 @@
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
+
+# l ... hash len
+# n ... number of hash tables
+# k ... k-neares neighbours
 
 @dataclass
 class Data:
@@ -50,7 +55,7 @@ class Data:
         val_mask   = self.tracks[('set', 'split')] == 'validation'
         test_mask  = self.tracks[('set', 'split')] == 'test'
         
-        # Labels
+        # labels
         self.y_train = self.tracks.loc[train_mask, ('track', 'genre_top')]
         self.y_val   = self.tracks.loc[val_mask, ('track', 'genre_top')]
         self.y_test  = self.tracks.loc[test_mask, ('track', 'genre_top')]
@@ -60,6 +65,26 @@ class Data:
         self.x_val   = self.features.loc[val_mask]
         self.x_test  = self.features.loc[test_mask]
 
+def get_random_projection_matrix(input_dim, hash_length, seed=1):
+    # so the matrix is reproducible
+    np.random.seed(seed)
+    
+    scale = np.sqrt(3)
+    values = np.array([1,0,-1])
+    probabilitys = [1/6, 2/3, 1/6]
+
+    R = np.random.choice(values, size=(input_dim, hash_length), p=probabilitys)
+    R = scale * R
+    return R
+
+def compute_hashes(data, projection_matrix):
+    dot_products = np.dot(data, projection_matrix)
+
+    # TODO: I dont know if this is correct -> would create hashes that 
+    # are strings of 1s and 0s as in the blog https://medium.com/data-science/locality-sensitive-hashing-for-music-search-f2f1940ace23
+    hash_bits = (dot_products > 0).astype(int)
+    hash_strings = ["".join(map(str, row)) for row in hash_bits]
+    return hash_strings
 
 
 if __name__ == "__main__":
@@ -67,4 +92,17 @@ if __name__ == "__main__":
     path_to_features = Path("data/fma_metadata/features.csv")
 
     data = Data(path_to_tracks, path_to_features)
+    # maybe we can start from here? 
+    labels = data.x_train.values
+    features = data.y_train
+
+    input_dim = labels.shape[1]
+    hash_length = 32
+
+    R = get_random_projection_matrix(input_dim, hash_length)
+
+    train_hashes = compute_hashes(labels, R)
+
+    print(train_hashes)
+
 
