@@ -43,7 +43,7 @@ class Data:
         self.features = pd.read_csv(self.features_path, index_col=0, header=[0,1,2])
 
         # we only need the medium dataset as of PA1
-        medium_mask = self.tracks[('set', 'subset')] <= 'medium'
+        medium_mask = self.tracks[('set', 'subset')] == 'medium'
         self.tracks = self.tracks.loc[medium_mask]
         self.features = self.features.loc[self.tracks.index]
 
