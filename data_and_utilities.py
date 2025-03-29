@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 # n ... number of hash tables
 # k ... k-neares neighbours
 
+SEED = 1
+
 @dataclass
 class Data:
     tracks_path: Path
@@ -27,12 +29,12 @@ class Data:
     features: pd.DataFrame = field(init=False)
     
     # split accoring to tracks split
-    y_train: pd.Series = field(init=False)
-    y_val: pd.Series = field(init=False)
+    y_training: pd.Series = field(init=False)
+    y_validation: pd.Series = field(init=False)
     y_test: pd.Series = field(init=False)
     
-    x_train: pd.DataFrame = field(init=False)
-    x_val: pd.DataFrame = field(init=False)
+    x_training: pd.DataFrame = field(init=False)
+    x_validation: pd.DataFrame = field(init=False)
     x_test: pd.DataFrame = field(init=False)
 
     def __post_init__(self):
@@ -56,24 +58,62 @@ class Data:
         test_mask  = self.tracks[('set', 'split')] == 'test'
         
         # labels
-        self.y_train = self.tracks.loc[train_mask, ('track', 'genre_top')]
-        self.y_val   = self.tracks.loc[val_mask, ('track', 'genre_top')]
+        self.y_training = self.tracks.loc[train_mask, ('track', 'genre_top')]
+        self.y_validation   = self.tracks.loc[val_mask, ('track', 'genre_top')]
         self.y_test  = self.tracks.loc[test_mask, ('track', 'genre_top')]
 
         # features
-        self.x_train = self.features.loc[train_mask]
-        self.x_val   = self.features.loc[val_mask]
+        self.x_training = self.features.loc[train_mask]
+        self.x_validation   = self.features.loc[val_mask]
         self.x_test  = self.features.loc[test_mask]
 
-def get_random_projection_matrix(input_dim, hash_length, seed=1):
+class HashTable:
+    def __init__(self, hash_size, input_dimension):
+        self.hash_size = hash_size
+        self.input_dimension = input_dimension
+        self.projections = get_random_projection_matrix(input_dimension, hash_size)
+        self.buckets = {}
+
+    def generate_hash(self, vector):
+        projection = np.dot(vector, self.projections)
+        hash_bits = (projection > 0).astype(int)
+        return "".join(map(str, hash_bits))
+    
+    def __setitem__(self, vector, label):
+        hash_value = self.generate_hash(vector)
+        self.buckets[hash_value] = self.buckets.get(hash_value, []) + [label]
+    
+    def __getitem__(self, vector):
+        h = self.generate_hash(vector)
+        return self.buckets.get(h, [])
+    
+class LSH:
+    def __init__(self, num_tables, hash_size, input_dimension):
+        self.num_tables = num_tables
+        self.hash_tables = []
+        for i in range(num_tables):
+            self.hash_tables.append(HashTable(hash_size, input_dimension))
+    
+    def __setitem__(self, vector, label):
+        for table in self.hash_tables:
+            table[vector] = label
+    
+    def __getitem__(self, vector):
+        results = []
+        for table in self.hash_tables:
+            results.extend(table[vector])
+        return list(set(results))
+
+
+def get_random_projection_matrix(input_dimension, hash_length):
     # so the matrix is reproducible
-    np.random.seed(seed)
+    np.random.seed(SEED)
     
     scale = np.sqrt(3)
     values = np.array([1,0,-1])
     probabilitys = [1/6, 2/3, 1/6]
 
-    R = np.random.choice(values, size=(input_dim, hash_length), p=probabilitys)
+    R = np.random.choice(values, size=(input_dimension, hash_length), p=probabilitys)
     R = scale * R
     return R
 
@@ -93,16 +133,21 @@ if __name__ == "__main__":
 
     data = Data(path_to_tracks, path_to_features)
     # maybe we can start from here? 
-    labels = data.x_train.values
-    features = data.y_train
+    X_training = data.x_training.values # These are the genre labels.
+    y_training = data.y_training.values  
+    X_validation = data.x_validation.values
 
-    input_dim = labels.shape[1]
-    hash_length = 32
+    input_dimension = X_training.shape[1]
+    hash_length = 128  # l: desired hash length
+    num_tables = 30    # n: number of hash tables
 
-    R = get_random_projection_matrix(input_dim, hash_length)
+    lsh = LSH(num_tables, hash_length, input_dimension)
 
-    train_hashes = compute_hashes(labels, R)
+    # puting each track into its bucket
+    for vec, label in zip(X_training, y_training):
+        lsh[vec] = label
 
-    print(train_hashes)
-
-
+    # querying for each validation data there nearest gerne
+    for idx, vec in zip(data.x_validation.index, X_validation):
+        similar_labels = lsh[vec]
+        print(f"Validation track {idx} is similar to training tracks: {similar_labels}")
