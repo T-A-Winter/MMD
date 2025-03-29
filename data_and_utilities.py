@@ -134,20 +134,20 @@ if __name__ == "__main__":
     data = Data(path_to_tracks, path_to_features)
     # maybe we can start from here? 
     X_training = data.x_training.values # These are the genre labels.
-    y_training = data.y_training.values  
+    Y_training = data.y_training.values  
     X_validation = data.x_validation.values
 
     input_dimension = X_training.shape[1]
-    hash_length = 128  # l: desired hash length
+    hash_length = 64  # l: desired hash length
     num_tables = 30    # n: number of hash tables
 
     lsh = LSH(num_tables, hash_length, input_dimension)
 
     # puting each track into its bucket
-    for vec, label in zip(X_training, y_training):
-        lsh[vec] = label
+    for vector, label in zip(X_training, Y_training):
+        lsh[vector] = label
 
     # querying for each validation data there nearest gerne
-    for idx, vec in zip(data.x_validation.index, X_validation):
-        similar_labels = lsh[vec]
-        print(f"Validation track {idx} is similar to training tracks: {similar_labels}")
+    for index, vector in zip(data.x_validation.index, X_validation):
+        similar_labels = lsh[vector]
+        print(f"Validation track {index} is similar to training tracks: {similar_labels}")
