@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.spatial.distance import euclidean
+from collections import Counter
 
 # l ... hash len
 # n ... number of hash tables
@@ -127,15 +130,52 @@ def compute_hashes(data, projection_matrix):
     return hash_strings
 
 
+def evaluate_knn_lsh(data, lsh, k=5):
+    predictions = []
+
+    for track_id, features in data.x_validation.iterrows():
+        similar_tracks = lsh[features]  # tuples of (track_id, genre)
+        distances = []  # tuples of (track_id, genre, distance)
+
+        for track_id_candidate, candidate_label in similar_tracks: 
+            candidate_feature_vector = data.x_training.loc[track_id_candidate].values
+            euclidean_dist = euclidean(features, candidate_feature_vector)
+            distances.append((track_id_candidate, candidate_label, euclidean_dist))
+
+        distances.sort(key=lambda x: x[2])
+        top_k = distances[:k] 
+
+        if top_k:
+            predicted_genre = Counter(genre for _, genre, _ in top_k).most_common(1)[0][0]
+        else:
+            predicted_genre = "unknown"
+
+        predictions.append((track_id, predicted_genre))
+
+    
+    predicted_dict = dict(predictions)
+    correct_pred = 0
+
+    for track_id, true_genre in data.y_validation.items():
+        if predicted_dict.get(track_id) == true_genre:
+            correct_pred += 1
+
+    accuracy = correct_pred / len(data.y_validation)
+
+    return accuracy, predictions
+
+
 if __name__ == "__main__":
     path_to_tracks = Path("data/fma_metadata/tracks.csv")
     path_to_features = Path("data/fma_metadata/features.csv")
 
     data = Data(path_to_tracks, path_to_features)
     # maybe we can start from here? 
-    X_training = data.x_training.values # These are the genre labels.
-    Y_training = data.y_training.values  
+    X_training = data.x_training.values 
+    Y_training = data.y_training.values  # These are the genre labels.
+    
     X_validation = data.x_validation.values
+    Y_validation = data.y_validation.values 
 
     input_dimension = X_training.shape[1]
     hash_length = 64  # l: desired hash length
@@ -143,11 +183,12 @@ if __name__ == "__main__":
 
     lsh = LSH(num_tables, hash_length, input_dimension)
 
-    # puting each track into its bucket
-    for vector, label in zip(X_training, Y_training):
-        lsh[vector] = label
+    # hash each entry of the training set to its bucket. the buckets consist of tuples of (track_id, label)
+    for track_id, features in data.x_training.iterrows():
+        vector = features.values
+        label = data.y_training.loc[track_id] 
+        lsh[vector] = (track_id, label)
 
-    # querying for each validation data there nearest gerne
-    for index, vector in zip(data.x_validation.index, X_validation):
-        similar_labels = lsh[vector]
-        print(f"Validation track {index} is similar to training tracks: {similar_labels}")
+    k = 5
+    accuracy, predictions = evaluate_knn_lsh(data, lsh, k) # until now this only works for euclidean distance.
+    print(f"Accuracy: {accuracy:.4f}")
