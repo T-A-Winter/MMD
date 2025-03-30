@@ -130,7 +130,7 @@ def compute_hashes(data, projection_matrix):
     return hash_strings
 
 
-def evaluate_knn_lsh(data, lsh, k=5):
+def evaluate_knn_lsh(data, lsh, k=5, metric = "eucledian"):
     predictions = []
 
     for track_id, features in data.x_validation.iterrows():
@@ -139,8 +139,13 @@ def evaluate_knn_lsh(data, lsh, k=5):
 
         for track_id_candidate, candidate_label in similar_tracks: 
             candidate_feature_vector = data.x_training.loc[track_id_candidate].values
-            euclidean_dist = euclidean(features, candidate_feature_vector)
-            distances.append((track_id_candidate, candidate_label, euclidean_dist))
+            
+            if metric == "euclidean":
+                euclidean_dist = euclidean(features, candidate_feature_vector)
+                distances.append((track_id_candidate, candidate_label, euclidean_dist))
+            if metric == "cosine":
+               cos_sim = cosine_similarity(np.array(features).reshape(1,-1), np.array(candidate_feature_vector).reshape(1,-1))
+               distances.append((track_id_candidate, candidate_label, cos_sim))
 
         distances.sort(key=lambda x: x[2])
         top_k = distances[:k] 
@@ -190,5 +195,5 @@ if __name__ == "__main__":
         lsh[vector] = (track_id, label)
 
     k = 5
-    accuracy, predictions = evaluate_knn_lsh(data, lsh, k) # until now this only works for euclidean distance.
+    accuracy, predictions = evaluate_knn_lsh(data, lsh, k, "cosine") # until now this only works for euclidean distance.
     print(f"Accuracy: {accuracy:.4f}")
