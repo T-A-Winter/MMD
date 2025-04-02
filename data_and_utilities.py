@@ -1,7 +1,12 @@
+from copy import copy, deepcopy
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
+from collections import defaultdict, Counter
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.spatial.distance import euclidean
 
 # l ... hash len
 # n ... number of hash tables
@@ -67,12 +72,17 @@ class Data:
         self.x_validation   = self.features.loc[val_mask]
         self.x_test  = self.features.loc[test_mask]
 
+@dataclass
+class Bucket:
+    genres: set[str] = field(default_factory=set)
+
 class HashTable:
     def __init__(self, hash_size: int, input_dimension: int):
         self.hash_size: int = hash_size
         self.input_dimension: int = input_dimension
         self.projections: np.ndarray
-        self.buckets: dict[str, list[str]] = {}
+        # {hash : (trackID, str)}
+        self.buckets: defaultdict[str, Bucket] = defaultdict(Bucket)
         self.get_random_projection_matrix(input_dimension, hash_size)
 
     def get_random_projection_matrix(self, input_dimension, hash_length):
@@ -87,20 +97,32 @@ class HashTable:
         R = scale * R
         self.projections = R
 
-    def generate_hash(self, vector):
+    def generate_hash(self, vector) -> str:
         projection = np.dot(vector, self.projections)
         # TODO: I dont know if this is correct -> would create hashes that 
         # are strings of 1s and 0s as in the blog https://medium.com/data-science/locality-sensitive-hashing-for-music-search-f2f1940ace23
         hash_bits = (projection > 0).astype(int)
         return "".join(map(str, hash_bits))
-    
-    def __setitem__(self, vector, label):
+
+    def set_item(self, vector: np.ndarray, label: str):
         hash_value = self.generate_hash(vector)
-        self.buckets[hash_value] = self.buckets.get(hash_value, []) + [label]
-    
-    def __getitem__(self, vector):
-        h = self.generate_hash(vector)
-        return self.buckets.get(h, [])
+        self.buckets[hash_value].genres.add(label)
+
+    def get_item(self, vector: np.ndarray) -> Bucket:
+        hash_value = self.generate_hash(vector)
+        return self.buckets[hash_value]
+
+
+    # def __setitem__(self, vector: np.ndarray, value: tuple[int, str]):
+    #     track_id, label = value
+    #     hash_value = self.generate_hash(vector)
+    #     bucket = self.buckets[hash_value]
+    #     bucket.track_ids.add(track_id)
+    #     bucket.genres.add(label)
+    #
+    # def __getitem__(self, vector):
+    #     h = self.generate_hash(vector)
+    #     return self.buckets.get(h, [])
     
 class LSH:
     def __init__(self, num_tables: int, hash_size: int, input_dimension: int):
@@ -108,10 +130,27 @@ class LSH:
         self.hash_tables = []
         for i in range(num_tables):
             self.hash_tables.append(HashTable(hash_size, input_dimension))
-    
-    def __setitem__(self, vector, label):
+
+    def set_item(self, vector: np.ndarray, label: str):
         for table in self.hash_tables:
-            table[vector] = label
+            table.set_item(vector, label)
+
+    def query(self, vector: np.ndarray):
+        """getting back a bucket with all genres accords all tables and the hashes"""
+        result_bucket = Bucket()
+        result_hashes = []
+        #create a bucket obj out of all buckets from all tables
+        for table in self.hash_tables:
+            bucket = table.get_item(vector)
+            result_bucket.genres.update(bucket.genres)
+            result_hashes.append(table.generate_hash(vector))
+
+        return  result_hashes, result_bucket
+
+    def __setitem__(self, vector: np.ndarray, value: tuple[int, str]):
+        track_id, label = value
+        for table in self.hash_tables:
+            table[vector] = track_id, label
     
     def __getitem__(self, vector):
         results = []
@@ -120,30 +159,44 @@ class LSH:
         return list(set(results))
 
 
+def predict_genre_for_bucket(candidate_vectors: pd.DataFrame, candidate_labels: pd.DataFrame, k: int, metric: str = "euclidean"):
+    predictions = {}
 
+    features = candidate_vectors.values
+    track_ids = candidate_vectors.index
 
+    for i, track_id_i  in enumerate(track_ids):
+        t_i_vector = features[i]
 
-if __name__ == "__main__":
-    path_to_tracks = Path("data/fma_metadata/tracks.csv")
-    path_to_features = Path("data/fma_metadata/features.csv")
+        similarities = []
 
-    data = Data(path_to_tracks, path_to_features)
-    # maybe we can start from here? 
-    X_training = data.x_training.values # These are the genre labels.
-    Y_training = data.y_training.values  
-    X_validation = data.x_validation.values
+        for j, track_id_j in enumerate(track_ids):
+            if track_id_i == track_id_j:
+                continue # we skip if we are the same item
 
-    input_dimension = X_training.shape[1]
-    hash_length = 64  # l: desired hash length
-    num_tables = 10    # n: number of hash tables
+            t_j_vector = features[j]
 
-    lsh = LSH(num_tables, hash_length, input_dimension)
+            if metric == "cosine":
+                # higher means more similar
+                similarity = cosine_similarity(t_i_vector.reshape(1, -1), t_j_vector.reshape(1, -1))[0,0]
+            elif metric == "euclidean":
+                # smaller means more similar
+                similarity = -euclidean(t_i_vector, t_j_vector)
+            else:
+                raise ValueError("dont have that metric")
 
-    # puting each track into its bucket
-    for vector, label in zip(X_training, Y_training):
-        lsh[vector] = label
+            similarities.append((similarity, track_id_j))
 
-    # querying for each validation data there nearest gerne
-    for index, vector in zip(data.x_validation.index, X_validation):
-        similar_labels = lsh[vector]
-        print(f"Validation track {index} is similar to training tracks: {similar_labels}")
+        # sort by similarity
+        similarities.sort(reverse=True)
+
+        k_nearest = similarities[:k]
+        neighbours_ids = [track_id for _, track_id in k_nearest]
+        neighbours_labels = candidate_labels.loc[neighbours_ids]
+
+        most_common = Counter(neighbours_labels).most_common(1)
+        predicted_genre = most_common[0][0] if most_common else None
+
+        predictions[track_id_i] = predicted_genre
+
+    return predictions
