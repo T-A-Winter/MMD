@@ -1,3 +1,5 @@
 *.zip
 
 fma_metadata/
+
+__pycache__
