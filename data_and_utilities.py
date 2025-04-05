@@ -1,4 +1,5 @@
 from copy import copy, deepcopy
+from time import monotonic
 
 import pandas as pd
 import numpy as np
@@ -7,6 +8,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict, Counter
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.spatial.distance import euclidean
+
 
 # l ... hash len
 # n ... number of hash tables
@@ -177,3 +179,22 @@ def predict_genre_for_bucket(candidate_vectors: pd.DataFrame, candidate_labels: 
         predictions[track_id_i] = predicted_genre
 
     return predictions
+
+def runtime_estimate_exact_nn_search(x_train, x_val, metric="euclidean"):
+    a = x_val.values[0]
+    b = x_train.values[0]
+
+    # measure computation time of one comparision
+    start = monotonic()
+    if metric == "cosine":
+        _ = cosine_similarity(a.reshape(1, -1), b.reshape(1, -1))
+    elif metric == "euclidean":
+        _ = euclidean(a, b)
+    end = monotonic()
+    
+    print(f"single comparision: {single_time}")
+    single_time = end - start
+    total_pairs = len(x_val) * len(x_train)
+    est_total_time = single_time * total_pairs
+    
+    print(f"Estimated total time: {est_total_time:.2f} seconds")
