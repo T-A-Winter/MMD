@@ -192,7 +192,7 @@ def runtime_estimate_exact_nn_search(x_train, x_val, metric="euclidean"):
         _ = euclidean(a, b)
     end = monotonic()
     
-    print(f"single comparision: {single_time}")
+    # print(f"single comparision: {single_time}")
     single_time = end - start
     total_pairs = len(x_val) * len(x_train)
     est_total_time = single_time * total_pairs
