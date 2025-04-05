@@ -81,7 +81,7 @@ class HashTable:
         self.hash_size: int = hash_size
         self.input_dimension: int = input_dimension
         self.projections: np.ndarray
-        # {hash : (trackID, str)}
+        # {hash : (str)}
         self.buckets: defaultdict[str, Bucket] = defaultdict(Bucket)
         self.get_random_projection_matrix(input_dimension, hash_size)
 
@@ -112,17 +112,6 @@ class HashTable:
         hash_value = self.generate_hash(vector)
         return self.buckets[hash_value]
 
-
-    # def __setitem__(self, vector: np.ndarray, value: tuple[int, str]):
-    #     track_id, label = value
-    #     hash_value = self.generate_hash(vector)
-    #     bucket = self.buckets[hash_value]
-    #     bucket.track_ids.add(track_id)
-    #     bucket.genres.add(label)
-    #
-    # def __getitem__(self, vector):
-    #     h = self.generate_hash(vector)
-    #     return self.buckets.get(h, [])
     
 class LSH:
     def __init__(self, num_tables: int, hash_size: int, input_dimension: int):
@@ -146,18 +135,6 @@ class LSH:
             result_hashes.append(table.generate_hash(vector))
 
         return  result_hashes, result_bucket
-
-    def __setitem__(self, vector: np.ndarray, value: tuple[int, str]):
-        track_id, label = value
-        for table in self.hash_tables:
-            table[vector] = track_id, label
-    
-    def __getitem__(self, vector):
-        results = []
-        for table in self.hash_tables:
-            results.extend(table[vector])
-        return list(set(results))
-
 
 def predict_genre_for_bucket(candidate_vectors: pd.DataFrame, candidate_labels: pd.DataFrame, k: int, metric: str = "euclidean"):
     predictions = {}

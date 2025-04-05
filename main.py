@@ -1,5 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
+from time import monotonic
 
 from data_and_utilities import Data, LSH, predict_genre_for_bucket
 
@@ -57,7 +58,7 @@ def main(path_to_tracks: Path, path_to_features: Path, l: int, n: int, k: int, m
 
     if total > 0:
         accuracy = correct / total * 100
-        print(f"\nAccuracy: {accuracy:.2f}% ({correct}/{total} predictions correct)")
+        print(f"Accuracy: {accuracy:.2f}% ({correct}/{total} predictions correct)")
     else:
         print("No predictions made (no collisions or empty candidate sets)")
 
@@ -68,10 +69,26 @@ if __name__ == "__main__":
 
     path_to_tracks = Path("data/fma_metadata/tracks.csv")
     path_to_features = Path("data/fma_metadata/features.csv")
-    l = 128
-    n = 15
-    k = 10
-    metric = "cosine"
-    main(path_to_tracks, path_to_features,l, n, k, metric, verbose=False)
+    confics  = ((128, 15, 10, "cosine"),
+                (128, 15, 10, "euclidean"),
+                (128, 10, 5, "cosine"),
+                (128, 10, 5, "euclidean"),
+                (64, 10, 5, "cosine"),
+                (64, 10, 5, "euclidean"),
+                )
+    print("------------------------------------------------")
+    for conf in confics:
+        l = conf[0]
+        n = conf[1]
+        k = conf[2]
+        metric = conf[3]
+        print(f"Config: l: {l}, n: {n}, k: {k}, metric: {metric}")
+        start = monotonic()
+        main(path_to_tracks, path_to_features, l, n, k, metric, verbose=False)
+        end = monotonic()
+        time_elapsed = end - start
+        print(f"Time elapsed: {time_elapsed:.2f} seconds")
+        print("------------------------------------------------")
+
 
 
