@@ -49,7 +49,7 @@ def training_and_validation_merge(path_to_tracks: Path, path_to_features: Path, 
     correct = 0
     total = 0
     for (table_index, hash_value), track_ids in reverse_map.items():
-        if len(track_ids) > 1:
+        if len(track_ids) > 0:
             candidate_vectors = data.x_test.loc[list(track_ids)]
             candidate_labels = data.y_test.loc[list(track_ids)]
             predictions = predict_genre_for_bucket(candidate_vectors, candidate_labels, k=k, metric=metric)
@@ -60,6 +60,8 @@ def training_and_validation_merge(path_to_tracks: Path, path_to_features: Path, 
                 if verbose:
                     print(f"Track {track_id}: Predicted = {predicted_genre}, Actual = {actual}")
 
+                assert predicted_genre is not None
+
                 if predicted_genre is not None:
                     total += 1
                     if predicted_genre == actual:
@@ -67,7 +69,7 @@ def training_and_validation_merge(path_to_tracks: Path, path_to_features: Path, 
 
     if total > 0:
         accuracy = correct / total * 100
-        print(f"Accuracy: {accuracy:.2f}% ({correct}/{total} predictions correct)")
+        print(f"Accuracy: {accuracy:.2f}% predictions correct)")
     else:
         print("No predictions made (no collisions or empty candidate sets)")
 
@@ -88,7 +90,7 @@ def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int
     # ------------------ TRAINING ------------------
     # putting each track into its hash table. "Training" the LSH
     for vector, track_id, label in zip(X_training_vectors, X_training_ids, labels_training):
-        lsh.set_item(vector, label,)
+        lsh.set_item(vector, label)
 
     # ------------------ VALIDATING ------------------
     reverse_map = defaultdict(set)  # { (table_index, hash_value) : set of validation track IDs }
@@ -103,7 +105,7 @@ def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int
     total = 0
     for (table_index, hash_value), track_ids in reverse_map.items():
         # checking for collisions
-        if len(track_ids) > 1:
+        if len(track_ids) > 0:
             candidate_pairs_vectors = data.x_validation.loc[list(track_ids)]
             candidate_pairs_labels = data.y_validation.loc[list(track_ids)]
             predictions = predict_genre_for_bucket(candidate_pairs_vectors, candidate_pairs_labels, k=k, metric=metric)
@@ -114,6 +116,8 @@ def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int
                 if verbose:
                     print(f"Track {track_id}: Predicted = {predicted_genre}, Actual = {actual}")
 
+                assert predicted_genre is not None
+
                 if predicted_genre is not None:
                     total += 1
                     if predicted_genre == actual:
@@ -121,7 +125,7 @@ def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int
 
     if total > 0:
         accuracy = correct / total * 100
-        print(f"Accuracy: {accuracy:.2f}% ({correct}/{total} predictions correct)")
+        print(f"Accuracy: {accuracy:.2f}% predictions correct)")
     else:
         print("No predictions made (no collisions or empty candidate sets)")
 
@@ -168,6 +172,6 @@ if __name__ == "__main__":
     path_to_tracks = Path("data/fma_metadata/tracks.csv")
     path_to_features = Path("data/fma_metadata/features.csv")
     verbose = False
-    main(l, n, k, path_to_tracks=path_to_tracks, path_to_features=path_to_features, run_validation=False, run_on_real_date=False, run_estimate= True, metric=metric, verbose=verbose)
+    main(l, n, k, path_to_tracks=path_to_tracks, path_to_features=path_to_features, run_validation=True, run_on_real_date=True, run_estimate= True, metric=metric, verbose=verbose)
 
 

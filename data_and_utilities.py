@@ -138,6 +138,8 @@ class LSH:
 
         return  result_hashes, result_bucket
 
+
+
 def predict_genre_for_bucket(candidate_vectors: pd.DataFrame, candidate_labels: pd.DataFrame, k: int, metric: str = "euclidean"):
     predictions = {}
 
