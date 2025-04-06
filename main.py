@@ -67,7 +67,7 @@ def training_and_validation_merge(path_to_tracks: Path, path_to_features: Path, 
 
     if total > 0:
         accuracy = correct / total * 100
-        print(f"Accuracy: {accuracy:.2f}% predictions correct)")
+        print(f"Accuracy: {accuracy:.2f}% predictions correct")
     else:
         print("No predictions made (no collisions or empty candidate sets)")
 
@@ -114,8 +114,6 @@ def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int
                 if verbose:
                     print(f"Track {track_id}: Predicted = {predicted_genre}, Actual = {actual}")
 
-                assert predicted_genre is not None
-
                 if predicted_genre is not None:
                     total += 1
                     if predicted_genre == actual:
@@ -123,7 +121,7 @@ def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int
 
     if total > 0:
         accuracy = correct / total * 100
-        print(f"Accuracy: {accuracy:.2f}% predictions correct)")
+        print(f"Accuracy: {accuracy:.2f}% predictions correct")
     else:
         print("No predictions made (no collisions or empty candidate sets)")
 
@@ -152,6 +150,7 @@ def main(l:int, n:int,k:int, path_to_tracks:Path, path_to_features:Path,  run_va
             print("------------------------------------------------")
 
     if run_on_real_date:
+        print("running the algorithm on the test set:")
         training_and_validation_merge(path_to_tracks, path_to_features, l, n,k ,metric, verbose)
 
     if run_estimate:
@@ -170,6 +169,6 @@ if __name__ == "__main__":
     path_to_tracks = Path("data/fma_metadata/tracks.csv")
     path_to_features = Path("data/fma_metadata/features.csv")
     verbose = False
-    main(l, n, k, path_to_tracks=path_to_tracks, path_to_features=path_to_features, run_validation=True, run_on_real_date=False, run_estimate= True, metric=metric, verbose=verbose)
+    main(l, n, k, path_to_tracks=path_to_tracks, path_to_features=path_to_features, run_validation=False, run_on_real_date=True, run_estimate=False, metric=metric, verbose=verbose)
 
 
