@@ -60,8 +60,6 @@ def training_and_validation_merge(path_to_tracks: Path, path_to_features: Path, 
                 if verbose:
                     print(f"Track {track_id}: Predicted = {predicted_genre}, Actual = {actual}")
 
-                assert predicted_genre is not None
-
                 if predicted_genre is not None:
                     total += 1
                     if predicted_genre == actual:
@@ -75,7 +73,7 @@ def training_and_validation_merge(path_to_tracks: Path, path_to_features: Path, 
 
 def training_and_validation(path_to_tracks: Path, path_to_features: Path, l: int, n: int, k: int, metric: str = "cosine",  verbose: bool = True):
     data = Data(path_to_tracks, path_to_features)
-    # maybe we can start from here?
+  
     X_training_vectors = data.x_training.values  # These are the genre labels.
     X_training_ids = data.x_training.index
     labels_training = data.y_training.values
@@ -172,6 +170,6 @@ if __name__ == "__main__":
     path_to_tracks = Path("data/fma_metadata/tracks.csv")
     path_to_features = Path("data/fma_metadata/features.csv")
     verbose = False
-    main(l, n, k, path_to_tracks=path_to_tracks, path_to_features=path_to_features, run_validation=True, run_on_real_date=True, run_estimate= True, metric=metric, verbose=verbose)
+    main(l, n, k, path_to_tracks=path_to_tracks, path_to_features=path_to_features, run_validation=True, run_on_real_date=False, run_estimate= True, metric=metric, verbose=verbose)
 
 
